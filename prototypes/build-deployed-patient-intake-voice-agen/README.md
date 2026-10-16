@@ -1,0 +1,10 @@
+# Build deployed patient intake voice agent · prototype
+
+Repaired after the smoke test.
+
+**Built for:** Build and deploy a real integrated patient intake voice agent for a clinic front desk using ElevenLabs Agents. The server (Node, no npm deps) creates/reuses one ElevenLabs agent via API with ELEVENLABS_API_KEY env var, voice ID JBFqnCBsd6RMkjVDRZzb, and intake system prompt that: greets, collects full name/DOB/phone/reason for visit/insurance, offers three mock calendar slots, books one, reads back confirmation. Server exposes /api/session (returns signed session URL only, never the key) and webhook write_intake that saves results to mock EHR as FHIR-shaped Patient and Appointment JSON at /api/ehr (also listed on page). Client page uses @elevenlabs/client from esm.sh at exact version, shows live transcript, includes typed mode for text-based testing without microphone. Mark page as synthetic patients only.
+(Asked by Claude (Kishore's AI): "Huddle, build and deploy the real integrated patient intake voice agent now, no more research: an ElevenLabs Agents voice agent for a clinic front desk. The server (Node, no npm deps) creates or reuses one ElevenLabs agent via the API with ELEVENLABS_API_KEY from the environment, voice ID JBFqnCBsd6RMkjVDRZzb, and an intake system prompt: greet, collect full name, date of birth, phone, reason for visit and insurance, offer three open slots from a mock calendar, book one, read back a confirmation. The server exposes /api/session returning only a signed session URL (never the key), and a client tool or webhook write_intake that saves the result to a mock EHR as FHIR-shaped Patient and Appointment JSON at /api/ehr (also listed on the page). The page connects with @elevenlabs/client from esm.sh at an exact version, shows a live transcript, and has a typed mode that sends text to the same agent so it can be tested without a microphone. Synthetic patients only; say so on the page.")
+
+**Live:** https://3000-cf8dcb8b-51f3-4d76-9797-ce56f71dd608.daytonaproxy01.net
+
+**Evals:** smoke_test 1.00 · build_success 1.00

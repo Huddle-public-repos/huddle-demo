@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Riverside Clinic – Intake Voice Agent (prototype)</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.4 system-ui,sans-serif;background:#f4f6f8;color:#1b2430}
+  header{background:#0b5cad;color:#fff;padding:10px 14px}
+  header h1{margin:0;font-size:18px}
+  .warn{background:#fff3cd;color:#664d03;padding:8px 14px;font-size:14px;border-bottom:1px solid #ecd98a}
+  main{max-width:900px;margin:0 auto;padding:12px;display:grid;gap:12px}
+  @media(min-width:800px){main{grid-template-columns:1.2fr 1fr}}
+  section{background:#fff;border-radius:10px;padding:12px;box-shadow:0 1px 3px #0002}
+  h2{margin:0 0 8px;font-size:16px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  button{font:inherit;padding:10px 14px;border:0;border-radius:8px;background:#0b5cad;color:#fff;cursor:pointer}
+  button.alt{background:#2f7d4f}button.end{background:#a33}
+  button:disabled{opacity:.45;cursor:default}
+  #status{font-size:14px;color:#555;margin-bottom:6px}
+  #log{height:340px;overflow-y:auto;background:#f9fafb;border:1px solid #dde3ea;border-radius:8px;padding:8px}
+  .m{margin:6px 0;padding:7px 10px;border-radius:10px;max-width:92%;white-space:pre-wrap;word-wrap:break-word}
+  .ai{background:#e3effa}.user{background:#dff3e5;margin-left:auto}
+  .tool{background:#fff8e1;font-size:13px;font-family:monospace}.err{background:#fde2e2;color:#7a1414}
+  form{display:flex;gap:8px;margin-top:8px}
+  input{flex:1;font:inherit;padding:10px;border:1px solid #bcc6d1;border-radius:8px;min-width:0}
+  pre{margin:0;max-height:420px;overflow:auto;background:#10161d;color:#cfe3f5;padding:10px;border-radius:8px;font-size:12px}
+  a{color:#0b5cad}
+</style>
+</head>
+<body>
+<header><h1>Riverside Clinic – Patient Intake Voice Agent</h1></header>
+<div class="warn"><b>Synthetic patients only.</b> Do not enter real names, dates of birth, phone numbers or insurance data. No BAA is in place; this is a prototype.</div>
+<main>
+  <section>
+    <h2>Conversation</h2>
+    <div class="row">
+      <button id="bText" class="alt">Start typed session</button>
+      <button id="bVoice">Start voice session</button>
+      <button id="bEnd" class="end" disabled>End</button>
+    </div>
+    <div id="status">Not connected. Typed mode needs no microphone.</div>
+    <div id="log" aria-live="polite"></div>
+    <form id="f">
+      <input id="t" placeholder="Type what the patient says…" autocomplete="off" disabled>
+      <button id="bSend" disabled>Send</button>
+    </form>
+  </section>
+  <section>
+    <h2>Mock EHR · <a href="/api/ehr" target="_blank">/api/ehr</a></h2>
+    <div class="row"><button id="bRef" class="alt">Refresh</button></div>
+    <div id="sum" style="font-size:14px;margin-bottom:6px"></div>
+    <pre id="ehr">Loading…</pre>
+  </section>
+</main>
+<script type="module">
+const $ = id => document.getElementById(id);
+let conv = null, textMode = false;
+
+function add(cls, text) {
+  const d = document.createElement('div');
+  d.className = 'm ' + cls; d.textContent = text;
+  $('log').append(d); $('log').scrollTop = $('log').scrollHeight;
+}
+async function api(p, o) {
+  const r = await fetch(p, o);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+  return j;
+}
+async function loadEhr() {
+  try {
+    const j = await api('/api/ehr');
+    const pts = j.entry.filter(e => e.resource.resourceType === 'Patient').length;
+    const aps = j.entry.filter(e => e.resource.resourceType === 'Appointment').length;
+    $('sum').textContent = `${pts} Patient, ${aps} Appointment resource(s)`;
+    $('ehr').textContent = JSON.stringify(j, null, 2);
+  } catch (e) { $('ehr').textContent = 'Could not load EHR: ' + e.message; }
+}
+
+// Client tools the ElevenLabs agent calls; both hit this server's mock calendar / EHR.
+const clientTools = {
+  get_open_slots: async () => {
+    try {
+      const j = await api('/api/slots');
+      add('tool', '📅 get_open_slots → ' + j.slots.map(s => s.label).join(' | '));
+      return JSON.stringify(j);
+    } catch (e) { return 'Error: ' + e.message; }
+  },
+  write_intake: async params => {
+    try {
+      const j = await api('/api/intake', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(params || {}) });
+      add('tool', '✅ write_intake → ' + j.confirmation);
+      loadEhr();
+      return JSON.stringify(j);
+    } catch (e) {
+      add('tool', '⚠️ write_intake rejected: ' + e.message);
+      return 'Error: ' + e.message;
+    }
+  }
+};
+
+function setConnected(on) {
+  $('bText').disabled = $('bVoice').disabled = on;
+  $('bEnd').disabled = !on;
+  $('t').disabled = $('bSend').disabled = !on;
+  if (on) $('t').focus();
+}
+
+async function start(isText) {
+  if (conv) return;
+  textMode = isText;
+  $('bText').disabled = $('bVoice').disabled = true;
+  $('status').textContent = 'Connecting…';
+  $('log').textContent = '';
+  try {
+    const { signedUrl } = await api('/api/session', { method: 'POST' });
+    const { Conversation } = await import('https://esm.sh/@elevenlabs/client@0.7.0');
+    conv = await Conversation.startSession({
+      signedUrl,
+      connectionType: 'websocket',
+      textOnly: isText,
+      overrides: isText ? { conversation: { textOnly: true } } : undefined,
+      clientTools,
+      onConnect: () => { $('status').textContent = isText ? 'Connected (typed mode)' : 'Connected (voice) – speak or type'; },
+      onDisconnect: () => { conv = null; setConnected(false); $('status').textContent = 'Session ended.'; },
+      onMessage: ({ source, message }) => {
+        if (source === 'user' && textMode) return; // typed messages are echoed locally
+        add(source === 'user' ? 'user' : 'ai', message);
+      },
+      onModeChange: ({ mode }) => { if (!textMode) $('status').textContent = 'Connected (voice) – agent is ' + mode; },
+      onError: m => add('err', 'Error: ' + (m && m.message || m))
+    });
+    setConnected(true);
+  } catch (e) {
+    conv = null; setConnected(false);
+    const mic = /permission|not-?allowed|denied|NotFound/i.test(e.message || e.name || '');
+    add('err', (mic ? 'Microphone unavailable. Use "Start typed session" instead. ' : 'Could not start: ') + (e.message || e));
+    $('status').textContent = 'Not connected.';
+  }
+}
+
+$('bText').onclick = () => start(true);
+$('bVoice').onclick = () => start(false);
+$('bEnd').onclick = async () => { if (conv) await conv.endSession(); };
+$('bRef').onclick = loadEhr;
+$('f').onsubmit = e => {
+  e.preventDefault();
+  const v = $('t').value.trim();
+  if (!v || !conv) return;
+  add('user', v); $('t').value = '';
+  conv.sendUserMessage(v);
+};
+loadEhr();
+</script>
+</body>
+</html>
