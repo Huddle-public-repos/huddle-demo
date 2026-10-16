@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Riverside Clinic · Scheduling Agent (mock + ElevenLabs live mode)</title>
+<style>
+:root{--bg:#0f1720;--card:#17212d;--line:#263445;--tx:#e6edf3;--mut:#8a9bad;--ac:#3ddc97;--bl:#5aa9ff;--wr:#ffb454;--rd:#ff6b6b}
+*{box-sizing:border-box}body{margin:0;font:13px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+h1{font-size:15px;margin:0}h1 small{display:block;color:var(--wr);font-weight:400;font-size:11px}
+.ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+label{color:var(--mut);font-size:11px;display:flex;gap:5px;align-items:center}
+select{background:#0f1720;color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:3px;font-size:12px}
+#banner{padding:6px 16px;font-size:12px;border-bottom:1px solid var(--line);background:#3a2c12;color:var(--wr)}
+#mode{font-size:11px;padding:2px 10px;border-radius:99px;background:#3a2c12;color:var(--wr)}#mode.live{background:#12352a;color:var(--ac)}
+.grid{display:grid;grid-template-columns:1.1fr 1fr;gap:12px;padding:12px;height:calc(100vh - 100px);min-height:560px}
+@media(max-width:900px){.grid{grid-template-columns:1fr;height:auto}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.card h2{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:0;padding:8px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+.col{display:flex;flex-direction:column;gap:12px;min-height:0}
+#log{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:7px;min-height:260px}
+.m{max-width:84%;padding:7px 11px;border-radius:12px}.a{background:#1f3a52;align-self:flex-start}.u{background:#24473a;align-self:flex-end}.sys{align-self:center;color:var(--wr);font-size:12px}
+.bar{padding:8px;border-top:1px solid var(--line);display:flex;gap:6px}
+input[type=text],input[type=password]{flex:1;background:#0f1720;border:1px solid var(--line);color:var(--tx);padding:8px 10px;border-radius:8px;width:100%}
+button{background:#223244;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;font:inherit}
+button:hover{border-color:var(--bl)}button.mic{background:var(--ac);color:#06281a;font-weight:700;border:0}button.mic.on{background:var(--rd);color:#fff}
+.chips{padding:6px 8px;display:flex;gap:5px;flex-wrap:wrap;border-top:1px solid var(--line)}
+.chip{font-size:11px;padding:3px 8px;border-radius:99px}.chip.ex{border-style:dashed;color:var(--wr)}
+.pad{padding:8px 12px;overflow:auto}.row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)}
+.tag{font-size:11px;padding:1px 8px;border-radius:99px;background:#223244;height:fit-content}.ok{color:var(--ac)}.x{color:var(--rd)}.rs{color:var(--bl)}.w{color:var(--wr)}
+.tool{font:11px ui-monospace,monospace;padding:4px 12px;border-bottom:1px solid var(--line)}.tool b{color:var(--bl)}.tool i{color:var(--ac);font-style:normal}
+.note{font-size:12px;color:var(--mut)}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex-wrap:wrap}.tabs button{border:0;border-radius:0;background:none;color:var(--mut);font-size:11px;padding:8px 10px}.tabs button.on{color:var(--tx);box-shadow:inset 0 -2px var(--bl)}
+.tp{display:none;overflow:auto;padding:8px 12px;flex:1;font-size:12px}.tp.on{display:block}
+.tp input{margin:3px 0}pre{white-space:pre-wrap;font:11px ui-monospace,monospace;background:#0f1720;padding:8px;border-radius:8px;border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid var(--line);padding:4px;text-align:left;vertical-align:top;font-size:11.5px}th{color:var(--mut)}
+</style></head><body>
+<header><h1>Riverside Clinic · Scheduling agent prototype<small>Mock EHR data · not validated with clinic staff · runs as a browser mock until you connect an ElevenLabs agent</small></h1>
+<div class="ctl"><span id="mode">Mock mode</span>
+<label>Patient <select id="pt"><option value="est">Established (Maria Alvarez)</option><option value="new">New (no record)</option></select></label>
+<label>Appointments <select id="ap"><option value="one">Single open</option><option value="multi">Multiple open</option><option value="none">None</option></select></label>
+<label>Slots <select id="sl"><option value="many">Many (5)</option><option value="few">Few (2)</option><option value="none">None</option></select></label>
+<label><input type="checkbox" id="tts" checked> Speak (mock)</label><button id="reset">Restart call</button></div></header>
+<div id="banner">⚠ SCOPE LOCKED (team answer "former" = all 6 use cases, research mode): scheduling, rescheduling and cancellation are sourced. Intake, inquiries and follow-ups are EXPLORATORY stubs (dashed chips). Not for deployment until the research gate passes.</div>
+<div class="grid">
+<div class="card"><h2><span id="callh">Live call</span><span id="state">idle</span></h2><div id="log"></div><div class="chips" id="chips"></div>
+<div class="bar"><button class="mic" id="mic">🎤 Click to talk</button><input type="text" id="txt" placeholder="…or type what the patient says, Enter"><button id="send">Send</button></div></div>
+<div class="col">
+<div class="card" style="flex:none;max-height:210px"><h2><span>Schedule system (mock EHR)</span><span id="who"></span></h2><div class="pad" id="appts"></div><div class="pad note" id="open" style="padding-top:0"></div></div>
+<div class="card" style="flex:none;height:110px"><h2>Agent tool calls</h2><div id="tools" style="overflow:auto"></div></div>
+<div class="card" style="flex:1">
+<div class="tabs"><button data-t="el" class="on">Connect ElevenLabs</button><button data-t="tr">Research→design trace</button><button data-t="rg">Research gate</button><button data-t="vl">Validation plan</button><button data-t="ts">Scenario tests</button></div>
+<div class="tp on" id="el">
+<p class="note" style="margin-top:0"><b>Yes, you can supply credentials here.</b> Create a Conversational AI agent in ElevenLabs, add the client tools below, then paste its Agent ID. Public agents need only the ID. For private agents also paste an API key, which is used once to request a signed URL from api.elevenlabs.io. It is held in memory only (never stored) and the page is not hosted with a backend, so use a restricted key and revoke it after the demo.</p>
+<input type="text" id="aid" placeholder="Agent ID (agent_…)" autocomplete="off"><input type="password" id="akey" placeholder="API key (optional, private agents only)" autocomplete="off">
+<div style="display:flex;gap:6px;margin:4px 0"><button id="conn" class="mic">Connect live session</button><button id="disc">End session</button></div>
+<div id="cst" class="note">Not connected. Mic access needs browser permission; if the sandbox blocks it, open this page in its own tab. Typing still works in live mode.</div>
+<details><summary>Agent setup for the ElevenLabs dashboard (system prompt and client tools)</summary><pre id="cfgp"></pre></details></div>
+<div class="tp" id="tr"><table><tr><th>Design element</th><th>Status</th></tr>
+<tr><td>Tools: check_availability / book / reschedule / cancel</td><td class="ok">Partially sourced: ElevenLabs healthcare scheduling guide + Cadence case study</td></tr>
+<tr><td>Live mode: same tools as ElevenLabs client tools driving the mock EHR</td><td class="w">Integration code written, untested with a real agent until Agent ID is supplied</td></tr>
+<tr><td>DOB verification, 2-strike transfer</td><td class="w">Assumption, no source captured</td></tr>
+<tr><td>Offer 3 slots</td><td class="w">Assumption, no clinical scheduling study captured</td></tr>
+<tr><td>Intent keywords (mock only)</td><td class="w">Assumption; the live agent uses the LLM instead</td></tr>
+<tr><td>Emergency keyword screen</td><td class="x">Assumption, needs clinical safety review</td></tr>
+<tr><td>Intake / inquiry / follow-up</td><td class="x">Exploratory, unsourced</td></tr></table>
+<p class="note">Sources: (a) ElevenLabs healthcare scheduling guide, (b) Cadence case study (Anchor check, groundedness 0.85). Exact page URLs were not recorded in the handoff. Mayo/Epic items were context only.</p></div>
+<div class="tp" id="rg"><ul><li>Record exact URLs for sources (a) and (b).</li><li>Find a source for DOB verification and transfer policy.</li><li>Clinical safety review of the emergency screen.</li><li>Source or drop intake, inquiry and follow-up flows (scope is locked at 6, so these need sourcing).</li></ul></div>
+<div class="tp" id="vl"><ol><li>Connect a real ElevenLabs agent (this tab) and run the scenario pickers against it.</li><li>Compare tool-call logs with the mock flow and note any divergence.</li><li>Walk the flows with 1–2 front-desk staff: does it match their real verification and scheduling steps? What is missing?</li><li>Test with real call transcripts, then run a supervised pilot with staff fallback.</li></ol></div>
+<div class="tp" id="ts"><button id="run">Run all mock scenario flows</button><div id="tres" style="margin-top:8px"></div></div>
+</div></div></div>
+<script>
+const $=id=>document.getElementById(id);
+const SL={many:["Tue Jun 10 · 9:00 AM","Tue Jun 10 · 2:30 PM","Wed Jun 11 · 11:00 AM","Fri Jun 13 · 8:30 AM","Fri Jun 13 · 3:00 PM"],few:["Wed Jun 11 · 11:00 AM","Fri Jun 13 · 3:00 PM"],none:[]};
+const AP={none:[],one:[["A-1042","Thu Jun 12 · 10:30 AM","Dr. Patel","Follow-up visit"]],multi:[["A-1042","Thu Jun 12 · 10:30 AM","Dr. Patel","Follow-up visit"],["A-1043","Mon Jun 16 · 1:15 PM","Dr. Nguyen","Annual physical"]]};
+const IQ=["What's your full name?","Which insurance plan do you have, or are you self-pay?","What's the main reason for your visit?"];
+const EMERG=/chest pain|can't breathe|cannot breathe|trouble breathing|suicid|overdose|stroke|bleeding heavily/;
+let Q=false,LIVE=false,conv=null,last="",S,C,open,appts,nid;
+const cfg=()=>({pt:$("pt").value,ap:$("ap").value,sl:$("sl").value});
+const cl=s=>s.replace("·","at");
+function fresh(c){C=c||cfg();nid=1050;open=[...SL[C.sl]];appts=C.pt=="new"?[]:AP[C.ap].map(a=>({id:a[0],when:a[1],prov:a[2],type:a[3],st:"booked"}));
+S={step:"greet",intent:null,verified:false,tries:0,offer:[],ans:[]};$("ap").disabled=C.pt=="new";$("log").innerHTML="";$("tools").innerHTML="";
+if(!Q){$("callh").textContent="Live call · "+(C.pt=="new"?"caller: new patient":"caller: Maria Alvarez (est.)");chips();}render();
+if(!LIVE)say("Thanks for calling Riverside Clinic, this is the scheduling assistant. I can book, reschedule, or cancel an appointment. How can I help?");}
+function render(){if(Q)return;$("who").textContent=S.verified?(C.pt=="new"?"✔ provisional (new)":"✔ verified: M. Alvarez"):"unverified";
+$("appts").innerHTML=S.verified?(appts.map(a=>`<div class="row"><div><b>${a.when}</b><br><span class="note">${a.prov} · ${a.type} · ${a.id}</span></div><span class="tag ${a.st=="booked"?"ok":a.st=="cancelled"?"x":"rs"}">${a.st}</span></div>`).join("")||"<span class='note'>No appointments on record</span>"):"<span class='note'>Record hidden until DOB verified.</span>";
+$("open").innerHTML="<b style='color:var(--tx)'>Open slots:</b> "+(open.join(" · ")||"none");if(!LIVE)$("state").textContent=S.step;}
+function tool(n,a,r){if(Q)return;const d=document.createElement("div");d.className="tool";d.innerHTML=`<b>${n}</b>(${a}) → <i>${r}</i>`;$("tools").prepend(d);}
+function add(c,t){if(Q)return;const d=document.createElement("div");d.className="m "+c;d.textContent=t;$("log").append(d);$("log").scrollTop=1e9;}
+/* ELEVENLABS SWAP POINT (output): in mock mode this uses browser speechSynthesis. In live mode the ElevenLabs session (below) speaks, and say() is not called. */
+function say(t){last=t;add("a",t);if(Q)return;if($("tts").checked&&window.speechSynthesis){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=1.05;speechSynthesis.speak(u);}catch(e){}}}
+function chips(){const c=[["I need to book an appointment"],["I want to reschedule"],["Cancel my appointment"],["March 12, 1984"],["1/5/1990"],["the first one"],["the second one"],["yes"],["no"],["I have chest pain"],["I'm a new patient",1],["What are your hours?",1],["Follow-up on my test results",1]];
+$("chips").innerHTML="";c.forEach(([t,e])=>{const b=document.createElement("button");b.className="chip"+(e?" ex":"");b.textContent=t;b.onclick=()=>route(t);$("chips").append(b);});}
+const route=t=>LIVE&&conv?liveSend(t):handle(t);
+const has=(t,w)=>w.some(x=>t.includes(x));
+function intent(t){if(has(t,["resched","move my","change my"]))return"reschedule";if(t.includes("cancel"))return"cancel";
+if(has(t,["book","schedule","appointment","see a doctor"]))return"schedule";if(has(t,["new patient","intake","register","forms"]))return"intake";
+if(has(t,["hour","open","where","address","parking"]))return"inquiry";if(has(t,["follow","results","check in"]))return"followup";return null;}
+function ordinal(t){for(const [k,i] of [["first",0],["second",1],["third",2],["1",0],["2",1],["3",2],["one",0],["two",1],["three",2]])if(new RegExp("\\b"+k+"\\b").test(t))return i;return -1;}
+function pickFrom(list,t,f){const i=ordinal(t);if(i>=0&&list[i])return list[i];return list.find(x=>{const s=f(x).toLowerCase();return t.includes(s.split(" ")[0])&&(!/\d/.test(t)||t.includes(s.split(" · ")[1].split(":")[0]))});}
+function offer(){S.offer=open.slice(0,3);tool("check_availability","provider=any",S.offer.length+" slots");
+if(!S.offer.length){S.step="idle";tool("create_callback_task","front_desk","queued");return say("I'm sorry, there are no open slots right now. I'll flag this for front-desk staff to call you back.");}
+S.step="pick";say((S.offer.length<3?"I only have ":"I have ")+S.offer.map((s,i)=>(i+1)+": "+cl(s)).join(". ")+". Which works for you?");}
+function afterCur(){const a=S.cur;if(S.intent=="cancel"){S.step="confirmCancel";return say("I see your "+a.type+" with "+a.prov+" on "+cl(a.when)+". Shall I cancel it?");}
+say("I see your "+a.type+" on "+cl(a.when)+" with "+a.prov+".");offer();}
+function proceed(){if(S.intent=="schedule")return offer();
+if(S.intent=="followup"){if(C.pt=="new"){S.step="idle";return say("I don't see a prior visit on file for you, so I'll route this to the front desk.");}
+tool("get_last_visit","patient","Jun 3 · Dr. Patel");S.step="callback";return say("I see your visit with Dr. Patel on June 3. I can't read clinical results over the phone. I can send a message to the nurse line and arrange a callback. Would you like that?");}
+const b=appts.filter(x=>x.st=="booked");
+if(!b.length){S.step="offerBook";return say("I don't see an upcoming appointment on your record. Would you like to book one instead?");}
+tool("find_appointments","patient",b.length+" booked");
+if(b.length==1){S.cur=b[0];return afterCur();}
+S.step="which";say("I see "+b.map((a,i)=>(i+1)+": "+a.type+" on "+cl(a.when)).join(". ")+". Which one?");}
+function handle(raw){const t=raw.toLowerCase().trim();if(!t)return;add("u",raw);
+const yes=has(t,["yes","yeah","yep","sure","please","correct","ok"]),no=/\b(no|nope|don't)\b/.test(t),it=intent(t);
+if(EMERG.test(t)){S.step="idle";tool("escalate_emergency","keyword screen","alert staff");render();return say("If this is an emergency, please hang up and call 911 now. I'm also alerting clinical staff.");}
+if(S.step=="dob"){const ok=C.pt=="new"?/(19|20)\d\d/.test(t):(t.includes("1984")&&/(march 12|3\/12|03\/12|12 march|3-12|03-12)/.test(t));
+if(ok){S.verified=true;tool("verify_patient","dob=***",C.pt=="new"?"no record, provisional":"match");render();return proceed();}
+S.tries++;tool("verify_patient","dob=***","no match");if(S.tries>=2){S.step="idle";render();return say("I couldn't verify your identity, so I'll transfer you to the front desk.");}
+return say("That doesn't match our records. Could you repeat your date of birth?");}
+if(S.step=="intake"){S.ans.push(raw);if(S.ans.length<3){return say(IQ[S.ans.length]);}
+tool("create_intake_draft",S.ans.length+" fields","exploratory");S.verified=true;S.intent="schedule";S.step="offerBook";render();
+return say("Thanks "+S.ans[0]+". I'll text you the forms to complete before your visit. Would you like to book your first visit now?");}
+if(S.step=="which"){const a=pickFrom(appts.filter(x=>x.st=="booked"),t,x=>x.when);if(a){S.cur=a;return afterCur();}return say("Sorry, which one: first or second?");}
+if(S.step=="offerBook"&&(yes||no)){if(no){S.step="idle";render();return say("Okay. Anything else I can help with?");}S.intent="schedule";if(S.verified)return offer();S.step="dob";return say("Sure. First, can you confirm your date of birth?");}
+if(S.step=="callback"&&(yes||no)){S.step="idle";render();if(no)return say("Okay. Anything else?");tool("create_callback_task","nurse_line","queued");return say("Done. A nurse will call you back. Anything else?");}
+if(S.step=="pick"){const s=pickFrom(S.offer,t,x=>x);if(s){S.pick=s;S.step="confirm";render();return say("Great, "+cl(s)+". Shall I confirm that?");}if(!it)return say("Sorry, which option: first, second, or third?");}
+if((S.step=="confirm"||S.step=="confirmCancel")&&!yes&&!no&&!it)return say("Sorry, was that a yes or a no?");
+if(S.step=="confirm"&&(yes||no)){if(no){S.step="pick";render();return say("No problem. Which of the other options would you like?");}
+const s=S.pick;open=open.filter(x=>x!=s);
+if(S.intent=="reschedule"){S.cur.st="rescheduled";appts.push({id:"A-"+(++nid),when:s,prov:S.cur.prov,type:S.cur.type,st:"booked"});open.push(S.cur.when);tool("reschedule_appointment",S.cur.id+" → "+s,"ok");}
+else{appts.push({id:"A-"+(++nid),when:s,prov:"Dr. Patel",type:C.pt=="new"?"New-patient visit":"General visit",st:"booked"});tool("book_appointment",s,"confirmed");}
+S.step="idle";render();return say("You're all set for "+cl(s)+". A text confirmation is on its way. Anything else?");}
+if(S.step=="confirmCancel"&&(yes||no)){if(no){S.step="idle";render();return say("Okay, I've left your appointment as is. Anything else?");}
+S.cur.st="cancelled";open.push(S.cur.when);tool("cancel_appointment",S.cur.id,"cancelled, slot released");S.step="offerBook";render();return say("Your appointment is cancelled. Would you like to rebook for another day?");}
+if(it=="intake"){S.step="intake";S.ans=[];tool("exploratory_intake","unsourced","stub");render();return say("Welcome! I'll collect a few details first. "+IQ[0]);}
+if(it=="inquiry"){const d=new Date(),o=d.getDay()>0&&d.getDay()<6&&d.getHours()>=8&&d.getHours()<17;tool("get_clinic_info","hours","mock config");
+return say("We're open Monday to Friday, 8 AM to 5 PM, at 120 Riverside Ave, and we're "+(o?"open right now":"closed right now")+". (Exploratory: mock clinic config.)");}
+if(["schedule","reschedule","cancel","followup"].includes(it)){S.intent=it;if(S.verified)return proceed();S.step="dob";render();return say("Happy to help. First, can you please confirm your date of birth?");}
+if(yes||no)return say("Okay. Is there anything else I can help with?");
+say("Sorry, I didn't catch that. I can book, reschedule, or cancel an appointment.");}
+/* ELEVENLABS SWAP POINT (input): mock mode uses browser SpeechRecognition. Live mode uses the ElevenLabs session's own mic + STT. */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec,listening=false,muted=false;
+function micUI(on){listening=on;const m=$("mic");m.classList.toggle("on",on);m.textContent=on?"⏹ Listening… click to stop":"🎤 Click to talk";if(on)$("state").textContent="listening…";else render();}
+function listen(){if(LIVE&&conv){muted=!muted;try{conv.setMicMuted(muted)}catch(e){}$("mic").textContent=muted?"🔇 Mic muted (click to unmute)":"🎙 Live: mic open (click to mute)";return;}
+if(listening&&rec){try{rec.stop()}catch(e){}return;}
+if(!SR){add("sys","Speech recognition isn't supported in this browser/sandbox. Type what the patient says instead.");$("txt").focus();return;}
+try{speechSynthesis.cancel()}catch(e){}
+rec=new SR();rec.lang="en-US";rec.interimResults=false;
+rec.onstart=()=>micUI(true);rec.onresult=e=>handle(e.results[0][0].transcript);
+rec.onerror=e=>{add("sys","Mic unavailable ("+e.error+"). Type what the patient says instead.");micUI(false);$("txt").focus();};
+rec.onend=()=>micUI(false);
+try{rec.start();}catch(e){add("sys","Couldn't start the mic. Type instead.");micUI(false);}}
+function submit(){const v=$("txt").value;if(!v.trim())return;$("txt").value="";route(v);}
+/* ===== ELEVENLABS LIVE MODE =====
+   Client tools below mirror the mock EHR so the real agent's tool calls move the schedule panel.
+   Names/params must match the tools you create in the agent dashboard (see Agent setup). */
+const nrm=s=>String(s).toLowerCase().replace(/\bat\b/g,"").replace(/[^a-z0-9]/g,"");
+const findSlot=(list,s)=>list.find(x=>nrm(x)==nrm(s));
+const CT={
+verify_patient:({dob})=>{const d=String(dob).toLowerCase();const ok=C.pt=="new"?/(19|20)\d\d/.test(d):(d.includes("1984")&&/(1984-0?3-0?12|03\/12|3\/12|march 12|12 march)/.test(d));
+S.verified=ok;tool("verify_patient","dob=***",ok?(C.pt=="new"?"no record, provisional":"match"):"no match");render();return ok?(C.pt=="new"?"provisional_new_patient":"verified"):"no_match";},
+find_appointments:()=>{if(!S.verified)return"error: not verified";const b=appts.filter(a=>a.st=="booked");tool("find_appointments","patient",b.length+" booked");return JSON.stringify(b.map(a=>({id:a.id,when:a.when,provider:a.prov,type:a.type})));},
+check_availability:()=>{if(!S.verified)return"error: not verified";const o=open.slice(0,3);tool("check_availability","provider=any",o.length+" slots");return o.length?JSON.stringify(o):"no_slots: create a callback task";},
+book_appointment:({slot})=>{const s=findSlot(open,slot);if(!S.verified||!s){tool("book_appointment",slot,"rejected");return"error: slot unavailable or patient unverified";}
+open=open.filter(x=>x!=s);appts.push({id:"A-"+(++nid),when:s,prov:"Dr. Patel",type:C.pt=="new"?"New-patient visit":"General visit",st:"booked"});tool("book_appointment",s,"confirmed");render();return"booked "+s;},
+cancel_appointment:({appointment_id})=>{const a=appts.find(x=>x.id==appointment_id&&x.st=="booked");if(!S.verified||!a){tool("cancel_appointment",appointment_id,"rejected");return"error: not found";}
+a.st="cancelled";open.push(a.when);tool("cancel_appointment",a.id,"cancelled, slot released");render();return"cancelled";},
+reschedule_appointment:({appointment_id,new_slot})=>{const a=appts.find(x=>x.id==appointment_id&&x.st=="booked"),s=findSlot(open,new_slot);if(!S.verified||!a||!s){tool("reschedule_appointment",appointment_id,"rejected");return"error: not found or slot unavailable";}
+a.st="rescheduled";open=open.filter(x=>x!=s);open.push(a.when);appts.push({id:"A-"+(++nid),when:s,prov:a.prov,type:a.type,st:"booked"});tool("reschedule_appointment",a.id+" → "+s,"ok");render();return"rescheduled to "+s;},
+create_callback_task:({reason})=>{tool("create_callback_task",reason||"n/a","queued");return"queued";},
+escalate_emergency:()=>{tool("escalate_emergency","agent-detected","alert staff");return"staff alerted";}};
+$("cfgp").textContent=`SYSTEM PROMPT (design assumptions, pending validation):
+You are the scheduling assistant for Riverside Clinic. You can book, reschedule and cancel appointments. Before discussing any appointment, ask for date of birth and call verify_patient (pass ISO yyyy-mm-dd). After two failed attempts, say you will transfer to the front desk. Offer at most 3 slots from check_availability, then confirm the choice aloud before calling book_appointment / reschedule_appointment / cancel_appointment. If the caller mentions chest pain, trouble breathing, suicidal thoughts or similar, tell them to hang up and call 911 and call escalate_emergency. Never read clinical results; use create_callback_task for the nurse line. Exploratory (unsourced): intake, clinic hours, follow-ups.
+
+CLIENT TOOLS (type "client", wait for response = true):
+verify_patient(dob:string)
+find_appointments()
+check_availability()
+book_appointment(slot:string)
+cancel_appointment(appointment_id:string)
+reschedule_appointment(appointment_id:string, new_slot:string)
+create_callback_task(reason:string)
+escalate_emergency()
+Dashboard: Security tab → enable "client tools"/overrides as needed; for a public demo agent, disable auth.`;
+const cst=t=>$("cst").textContent=t;
+function setLive(on){LIVE=on;const m=$("mode");m.textContent=on?"ElevenLabs LIVE":"Mock mode";m.className=on?"live":"";$("tts").disabled=on;muted=false;$("mic").textContent=on?"🎙 Live: mic open (click to mute)":"🎤 Click to talk";}
+async function connect(){const id=$("aid").value.trim(),key=$("akey").value.trim();if(!id)return cst("Enter an Agent ID first.");
+try{cst("Loading ElevenLabs SDK…");try{speechSynthesis.cancel()}catch(e){}
+const {Conversation}=await import("https://cdn.jsdelivr.net/npm/@elevenlabs/client@0.4.0/+esm");
+const o={clientTools:CT,
+onMessage:m=>{const u=m.source=="user";add(u?"u":"a",m.message);if(!u)last=m.message;},
+onModeChange:m=>{$("state").textContent="live · "+m.mode},
+onError:e=>{add("sys","ElevenLabs error: "+(e&&e.message||e));},
+onDisconnect:()=>{conv=null;setLive(false);cst("Session ended. Back in mock mode.");fresh();}};
+if(key){cst("Requesting signed URL…");const r=await fetch("https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id="+encodeURIComponent(id),{headers:{"xi-api-key":key}});
+if(!r.ok)throw new Error("signed URL request failed ("+r.status+"). Check the key and Agent ID.");o.signedUrl=(await r.json()).signed_url;o.connectionType="websocket";}
+else{o.agentId=id;o.connectionType="webrtc";}
+$("akey").value="";cst("Connecting… allow microphone if prompted.");
+setLive(true);fresh();
+conv=await Conversation.startSession(o);cst("Connected. Speak, or type in the box. Tool calls appear on the right and update the schedule.");}
+catch(e){setLive(false);conv=null;cst("Could not connect: "+(e.message||e)+". Mock mode still works; if the mic is blocked by the sandbox, open the page in its own tab.");fresh();}}
+function liveSend(t){add("u",t);try{conv.sendUserMessage(t);}catch(e){add("sys","Typed messages need a text-capable session: "+e.message);}}
+async function disc(){if(conv){try{await conv.endSession();}catch(e){}}conv=null;setLive(false);cst("Not connected.");fresh();}
+const TESTS=[
+["Book (established, many slots)",{pt:"est",ap:"one",sl:"many"},["I need to schedule an appointment","March 12, 1984","the first one","yes"],()=>appts.length==2&&last.includes("all set")],
+["Cancel single appointment",{pt:"est",ap:"one",sl:"many"},["cancel my appointment","3/12/1984","yes"],()=>appts[0].st=="cancelled"],
+["Reschedule among multiple",{pt:"est",ap:"multi",sl:"many"},["I want to reschedule","March 12, 1984","second one","first","yes"],()=>appts[1].st=="rescheduled"&&appts.length==3],
+["Emergency escalation",{pt:"est",ap:"one",sl:"many"},["I have chest pain"],()=>last.includes("911")],
+["Two DOB failures → transfer",{pt:"est",ap:"one",sl:"many"},["book","1/1/2000","1/2/2000"],()=>last.includes("transfer")],
+["No slots → callback task",{pt:"est",ap:"one",sl:"none"},["book","March 12, 1984"],()=>last.includes("no open slots")],
+["Few slots (2) offered honestly",{pt:"est",ap:"one",sl:"few"},["book","March 12, 1984"],()=>last.includes("only have")],
+["New patient intake (exploratory)",{pt:"new",ap:"none",sl:"many"},["I'm a new patient","Sam Lee","Aetna","checkup","yes

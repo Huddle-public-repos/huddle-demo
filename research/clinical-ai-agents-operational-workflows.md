@@ -1,0 +1,27 @@
+# Clinical AI agents & operational workflows landscape · research (revision)
+
+{"query":"AI agents for clinical backend operations workflow tools tech stacks"}
+
+## Sources
+- [itsourcecode.com](https://itsourcecode.com/web-dev/langchain-agents-vs-autogpt-vs-crewai-2026-framework-comparison/?lt)
+- [dev.to](https://dev.to/mzunain/autogpt-vs-langchain-vs-crewai-which-framework-should-you-use-in-2026-1c97)
+- [markaicode.com](https://markaicode.com/best/best-agent-framework-production-multi-agent/)
+- [devtoollab.com](https://devtoollab.com/blog/langgraph-vs-crewai-vs-autogen)
+- [arxiv.org](https://arxiv.org/html/2603.11721v1)
+- [ideausher.com](https://ideausher.com/blog/healthcare-rpa-companies/)
+- [mindbowser.com](https://www.mindbowser.com/best-rpa-tools/)
+- [dev.to](https://dev.to/agdex_ai/langchain-vs-crewai-vs-autogen-vs-dify-the-complete-ai-agent-framework-comparison-2026-4j8j)
+- [getprosper.ai](https://www.getprosper.ai/blog/ai-agent-healthcare-tools)
+- [linear.health](https://linear.health/blog/referral-management-process)
+- [marsdevs.com](https://www.marsdevs.com/guides/building-healthtech-mvps)
+- [gmtasoftware.com](https://www.gmtasoftware.com/blog/ehr-software-development/)
+- [suffescom.com](https://www.suffescom.com/blog/hipaa-compliant-patient-portal-development)
+- [cloudbyz.com](https://blog.cloudbyz.com/ai/technology-stack-recommendations-for-21-cfr-part-11-compliant-ai-agents-in-clinical-operations)
+- [geekyants.com](https://geekyants.com/blog/how-to-scale-ai-healthcare-products-while-staying-hipaa-and-fhir-compliant)
+- [acquaintsoft.com](https://acquaintsoft.com/blog/python-healthcare-data-compliance)
+- [getprosper.ai](https://www.getprosper.ai/blog/what-to-automate-healthcare-workflows)
+- [medesk.net](https://www.medesk.net/en/blog/patient-referral-management-software/)
+- [officeally.com](https://cms.officeally.com/blog/prevent-eligibility-mistakes)
+- [accountablehq.com](https://www.accountablehq.com/post/securing-insurance-verification-in-healthcare-a-step-by-step-guide-to-best-practices-and-compliance)
+- [anyreach.ai](https://blog.anyreach.ai/healthcare-workflow-stack/)
+- [acmso.org](https://acmso.org/medical-scribing/insurance-verification-definitive-glossary-amp-interactive-examples)

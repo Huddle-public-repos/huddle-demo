@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Riverside Clinic · Patient Intake Voice Agent (ElevenLabs)</title>
+<style>
+:root{--bg:#0f1720;--card:#17212d;--line:#263445;--tx:#e6edf5;--mut:#8da0b5;--ac:#3ddc97;--bl:#5aa9ff;--wa:#ffb84d;--er:#ff6b6b}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,Segoe UI,sans-serif;background:var(--bg);color:var(--tx)}
+header{padding:14px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:17px;margin:0}h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:0 0 10px}
+.tag{font-size:11px;padding:3px 8px;border-radius:99px;border:1px solid var(--line);color:var(--mut)}
+.grid{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;padding:16px 22px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px}
+.row{display:flex;gap:8px;align-items:center}input{flex:1;background:#0c141c;border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:9px 10px;font:inherit}
+button{background:var(--bl);color:#04121f;border:0;border-radius:8px;padding:9px 13px;font-weight:600;cursor:pointer}
+button.g{background:transparent;color:var(--tx);border:1px solid var(--line)}button:disabled{opacity:.45;cursor:not-allowed}
+#mic.rec{background:var(--er);color:#fff;animation:p 1s infinite}@keyframes p{50%{opacity:.6}}
+#log{height:310px;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:4px}
+.m{max-width:82%;padding:8px 11px;border-radius:12px}.a{background:#213246;align-self:flex-start}.u{background:#1d4d3b;align-self:flex-end}
+.sys{align-self:center;color:var(--mut);font-size:12px}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600}
+.s-idle{background:#2b3948;color:var(--mut)}.s-live{background:#1d4d3b;color:var(--ac)}.s-speak{background:#1e3a5c;color:var(--bl)}.s-err{background:#5a2323;color:var(--er)}
+.slot{display:flex;justify-content:space-between;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px}
+.slot.booked{border-color:var(--ac);background:#143226}.slot.free b{color:var(--tx)}
+.tool{font:12px ui-monospace,Menlo,monospace;color:var(--mut);padding:5px 0;border-bottom:1px dashed var(--line)}.tool b{color:var(--wa)}
+#banner{display:none;margin-top:10px;padding:8px 10px;border-radius:8px;background:#3a2a12;color:var(--wa);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut)}
+small{color:var(--mut)}
+</style></head><body>
+<header><div><h1>Riverside Clinic · Patient Intake &amp; Scheduling Voice Agent</h1>
+<small>Prototype v3 · live ElevenLabs speech (TTS + STT) · scheduling backend is mocked</small></div>
+<div><span class="tag">Scope locked: intake → scheduling → confirmation</span> <span id="st" class="pill s-idle">idle</span></div></header>
+
+<div class="grid"><div>
+<div class="card"><h2>1 · Connect ElevenLabs</h2>
+<div class="row"><input id="key" type="password" placeholder="Paste ElevenLabs API key (kept in memory only)" autocomplete="off">
+<button id="conn">Verify key</button></div>
+<small id="kst">Not connected — the agent runs in typed-only, text replies (no voice) until a key is verified. Use a temporary key; revoke it after testing.</small>
+<div id="banner"></div></div>
+
+<div class="card"><h2>2 · Call</h2>
+<div class="row" style="margin-bottom:10px"><button id="start">Start call</button><button id="end" class="g" disabled>End call</button>
+<small>Voice: Rachel · eleven_flash_v2_5 · STT: scribe_v1</small></div>
+<div id="log"><div class="sys m">Press “Start call”. Try: “Maria Alvarez”, DOB 03/14/1986, “annual physical”, “the second one”, “yes”.</div></div>
+<div class="row" style="margin-top:10px"><button id="mic" class="g" disabled title="Click to record, click again to send">🎤 Speak</button>
+<input id="txt" placeholder="Type what the patient says, press Enter" disabled><button id="send" disabled>Send</button></div></div>
+</div>
+
+<div>
+<div class="card"><h2>Schedule · Dr. Patel (mock)</h2><div id="slots"></div>
+<div id="appt" style="margin-top:8px"><small>No appointment booked yet.</small></div></div>
+<div class="card"><h2>Tool calls (mock clinic backend)</h2><div id="tools"><small>No tool calls yet.</small></div></div>
+<div class="card"><h2>Traceability: capability → source</h2><table>
+<tr><th>Capability</th><th>Source</th></tr>
+<tr><td>Scope = patient intake + scheduling only</td><td>#29 (use case), task brief; other 5 use cases excluded pending team scope decision</td></tr>
+<tr><td>ElevenLabs speech with real API key</td><td>#29 (“use 11 labs”), #66, #91</td></tr>
+<tr><td>Intake → DOB → slots → confirm → SMS flow</td><td>#84 smoke test (typed flow passed)</td></tr>
+<tr><td>Typed fallback when mic blocked</td><td>#84 (“Mic unavailable (not-allowed)”)</td></tr>
+<tr><td>Visible status, transcript, tool results, errors</td><td>#82 (nothing visible, status stuck “idle”)</td></tr>
+<tr><td>Mock EHR/SMS clearly labelled</td><td>#82 (mock disclosed); no backend per prototype rules</td></tr>
+</table></div></div></div>
+
+<script>
+// ---- Frozen decisions (not runtime options) ----
+const VOICE='21m00Tcm4TlvDq8ikWAM', TTS_MODEL='eleven_flash_v2_5', STT_MODEL='scribe_v1', API='https://api.elevenlabs.io/v1';
+const ROSTER=[{name:'Maria Alvarez',dob:'3/14/1986',mrn:'RC-20418'},{name:'James Okafor',dob:'11/2/1974',mrn:'RC-17733'}];
+let SLOTS=[{id:1,label:'Tue Jun 10 at 9:00 AM',state:'free'},{id:2,label:'Tue Jun 10 at 2:30 PM',state:'free'},{id:3,label:'Wed Jun 11 at 11:15 AM',state:'free'}];
+const $=id=>document.getElementById(id);
+let key='',keyOK=false,live=false,step='',pt={},busy=false,audio=null,rec=null,chunks=[];
+
+function status(t,c){const s=$('st');s.textContent=t;s.className='pill s-'+c}
+function banner(t){const b=$('banner');b.style.display=t?'block':'none';b.textContent=t||''}
+function add(cls,t){const d=document.createElement('div');d.className='m '+cls;d.textContent=t;$('log').appendChild(d);$('log').scrollTop=1e9}
+function tool(name,args,res){const t=$('tools');if(t.querySelector('small'))t.innerHTML='';const d=document.createElement('div');d.className='tool';
+ d.innerHTML='<b></b>(<span class=a></span>) → <span class=r></span>';d.querySelector('b').textContent=name;d.querySelector('.a').textContent=args;d.querySelector('.r').textContent=res;t.prepend(d)}
+function renderSlots(){$('slots').innerHTML='';SLOTS.forEach(s=>{const d=document.createElement('div');d.className='slot '+s.state;
+ d.innerHTML='<b></b><span></span>';d.firstChild.textContent=s.label;d.lastChild.textContent=s.state==='booked'?'BOOKED':'open';$('slots').appendChild(d)})}
+
+// ---- ElevenLabs ----
+$('conn').onclick=async()=>{key=$('key').value.trim();if(!key)return banner('Paste an API key first.');
+ $('kst').textContent='Verifying…';
+ try{const r=await fetch(API+'/voices/'+VOICE,{headers:{'xi-api-key':key}});
+  if(!r.ok)throw new Error('HTTP '+r.status+' '+(await r.text()).slice(0,140));
+  keyOK=true;banner('');$('kst').textContent='✔ Connected. Agent speech (TTS) enabled; microphone uses ElevenLabs Scribe.';
+ }catch(e){keyOK=false;banner('Key check failed: '+e.message+' (a restricted key may still work for TTS/STT; try Start call.)');$('kst').textContent='Not verified — typed-only unless TTS succeeds.';}
+};
+async function speak(t){if(!key)return;status('agent speaking','speak');
+ try{const r=await fetch(API+'/text-to-speech/'+VOICE+'?output_format=mp3_44100_64',{method:'POST',headers:{'xi-api-key':key,'Content-Type':'application/json'},
+  body:JSON.stringify({text:t,model_id:TTS_MODEL})});
+  if(!r.ok)throw new Error('TTS HTTP '+r.status+' '+(await r.text()).slice(0,140));
+  const url=URL.createObjectURL(await r.blob());if(audio)audio.pause();audio=new Audio(url);
+  await new Promise(res=>{audio.onended=res;audio.onerror=res;audio.play().catch(e=>{banner('Audio blocked by browser: '+e.message);res()})});
+ }catch(e){banner(e.message)}
+ if(live)status('in call','live')}
+async function transcribe(blob){status('transcribing','speak');
+ const f=new FormData();f.append('file',blob,'a.webm');f.append('model_id',STT_MODEL);
+ const r=await fetch(API+'/speech-to-text',{method:'POST',headers:{'xi-api-key':key},body:f});
+ if(!r.ok)throw new Error('STT HTTP '+r.status+' '+(await r.text()).slice(0,140));
+ return (await r.json()).text||''}
+$('mic').onclick=async()=>{
+ if(rec){rec.stop();return}
+ if(!key){return banner('Add and verify an ElevenLabs key to use voice input; otherwise type the reply.')}
+ try{const st=await navigator.mediaDevices.getUserMedia({audio:true});chunks=[];rec=new MediaRecorder(st);
+  rec.ondataavailable=e=>chunks.push(e.data);
+  rec.onstop=async()=>{st.getTracks().forEach(t=>t.stop());$('mic').classList.remove('rec');$('mic').textContent='🎤 Speak';rec=null;
+   try{const t=await transcribe(new Blob(chunks,{type:'audio/webm'}));if(t.trim())turn(t.trim());else banner('No speech detected.')}catch(e){banner(e.message);status('in call','live')}};
+  rec.start();$('mic').classList.add('rec');$('mic').textContent='■ Stop & send';status('listening','speak');banner('');
+ }catch(e){rec=null;banner('Mic unavailable ('+(e.name==='NotAllowedError'?'not-allowed':e.name)+'). The sandbox may block microphone access — type what the patient says instead.')}
+};
+
+// ---- Agent logic ----
+async function say(t){add('a',t);await speak(t)}
+const cap=s=>s.replace(/\b\w/g,c=>c.toUpperCase());
+function parseDob(t){let m=t.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+ if(m)return +m[1]+'/'+(+m[2])+'/'+(m[3].length==2?(+m[3]>30?'19':'20')+m[3]:m[3]);
+ const mo=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+ m=t.toLowerCase().match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\.?\s+(\d{1,2})\w*,?\s+(\d{4})/);
+ return m?(mo.indexOf(m[1])+1)+'/'+(+m[2])+'/'+m[3]:null}
+function visitType(t){t=t.toLowerCase();return /physical|check.?up|annual/.test(t)?'Annual physical (30 min)':/follow/.test(t)?'Follow-up (15 min)':/new patient/.test(t)?'New patient visit (40 min)':/sick|cough|fever|pain|flu|sore/.test(t)?'Sick visit (20 min)':'General visit (20 min)'}
+async function turn(text){if(!live||busy)return;busy=true;add('u',text);$('txt').value='';
+ const low=text.toLowerCase();
+ if(/cancel|reschedul|refill|bill/.test(low)&&step!=='confirm'){await say("I can only help with scheduling a new appointment on this line. For anything else, I'll connect you to our front desk. Shall we continue booking?");busy=false;return}
+ if(step==='name'){pt.name=cap(text.replace(/^(hi|hello|yes|um|uh)[, ]+/i,'').replace(/(my name is|this is|i'?m|i am|it'?s)\s+/i,'').replace(/[.!?]+$/,'').trim());
+  step='dob';await say(`Thanks, ${pt.name.split(' ')[0]}. To verify your identity, what's your date of birth?`)}
+ else if(step==='dob'){const d=parseDob(text);
+  if(!d)await say("Sorry, I didn't catch a date. Please say it like March 14th, 1986.");
+  else{pt.dob=d;const hit=ROSTER.find(p=>p.name.toLowerCase()===pt.name.toLowerCase()&&p.dob===d);
+   pt.mrn=hit?hit.mrn:null;tool('lookup_patient',`${pt.name}, ${d}`,hit?`match ${hit.mrn}`:'no match → new-patient intake');
+   step='reason';await say(hit?'Thank you, I found your record. What is the reason for your visit?':"I don't see a record, so I'll set you up as a new patient. What is the reason for your visit?")}}
+ else if(step==='reason'){pt.visit=visitType(text);const open=SLOTS.filter(s=>s.state==='free');
+  tool('get_open_slots',pt.visit,open.length+' slots');step='slot';
+  await say(`Got it, ${pt.visit}. I have ${open.map((s,i)=>`option ${i+1}: ${s.label}`).join('; ')}. Which works for you?`)}
+ else if(step==='slot'){const open=SLOTS.filter(s=>s.state==='free');
+  let i=/(third|\b3\b|three|wed|11)/.test(low)?2:/(second|\b2\b|two|2:?30|afternoon)/.test(low)?1:/(first|\b1\b|\bone\b|9:?00|nine|morning)/.test(low)?0:-1;
+  if(i<0||!open[i])await say('Which option would you like — first, second, or third?');
+  else{pt.slot=open[i];step='confirm';await say(`I'll book ${pt.slot.label} for ${pt.visit}. Shall I confirm that?`)}}
+ else if(step==='confirm'){
+  if(/\b(yes|yeah|yep|sure|confirm|ok|okay|please|correct)\b/.test(low)){pt.slot.state='booked';renderSlots();
+   const id='APT-'+(4000+Math.floor(Math.random()*999));tool('book_appointment',`${pt.name}, ${pt.slot.label}`,id+' confirmed');
+   tool('send_sms_confirmation',pt.name,'queued (mock)');
+   $('appt').innerHTML='<div class="slot booked"><b></b><span></span></div>';$('appt').firstChild.firstChild.textContent=`${pt.name} · ${pt.slot.label}`;$('appt').firstChild.lastChild.textContent=id;
+   step='done';await say(`You're all set for ${pt.slot.label}. A text confirmation is on its way. Anything else?`)}
+  else{step='slot';SLOTS.forEach(()=>0);await say('No problem. Which option would you prefer instead — first, second, or third?')}}
+ else if(step==='done'){if(/no|nothing|that'?s all|bye/.test(low)){await say('Thanks for calling Riverside Clinic. Goodbye!');endCall()}else await say("For anything beyond scheduling, our front desk can help. Is there anything else about this booking?")}
+ busy=false}
+function ui(on){['txt','send','mic','end'].forEach(i=>$(i).disabled=!on);$('start').disabled=on}
+$('start').onclick=async()=>{key=$('key').value.trim()||key;live=true;step='name';pt={};busy=false;
+ SLOTS.forEach(s=>s.state='free');renderSlots();$('appt').innerHTML='<small>No appointment booked yet.</small>';
+ $('log').innerHTML='';ui(true);status('in call','live');banner(key?'':'No API key: typed-only mode, agent will not speak.');
+ await say("Thank you for calling Riverside Clinic. I'm the scheduling assistant. May I have your full name?");$('txt').focus()};
+function endCall(){live=false;if(audio)audio.pause();if(rec)rec.stop();ui(false);$('start').disabled=false;status('idle','idle');add('sys','Call ended.')}
+$('end').onclick=endCall;
+$('send').onclick=()=>$('txt').value.trim()&&turn($('txt').value.trim());
+$('txt').onkeydown=e=>{if(e.key==='Enter')$('send').click()};
+renderSlots();
+</script></body></html>
